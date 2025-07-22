@@ -47,7 +47,7 @@
 #  endif
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(MS_APP)
 #define MY_CONTEXT_USE_WIN32_FIBERS 1
 #elif defined(ASAN_PREFER_NON_ASM) && defined(HAVE_BOOST_CONTEXT_H)
 #define MY_CONTEXT_USE_BOOST_CONTEXT

@@ -46,6 +46,8 @@
 #include <dlfcn.h>
 #endif
 
+#include "windows_utils.h"
+
 struct st_client_plugin_int {
   struct st_client_plugin_int *next;
   void   *dlhandle;
@@ -402,13 +404,21 @@ mysql_load_plugin_v(MYSQL *mysql, const char *name, int type,
 
 
   /* Open new dll handle */
-  if (!(dlhandle= dlopen((const char *)dlpath, RTLD_NOW)))
+#ifdef MS_APP
+  wchar_t* pathW = to_utf16(dlpath);
+  dlhandle = LoadPackagedLibrary(pathW, 0);
+  free(pathW);
+#else
+  dlhandle = dlopen((const char*)dlpath, RTLD_NOW);
+#endif
+
+  if (!dlhandle)
   {
 #ifdef _WIN32
    char winmsg[255];
    size_t len;
    winmsg[0] = 0;
-   FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
+   FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM,
                  NULL,
                  GetLastError(),
                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),

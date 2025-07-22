@@ -337,7 +337,8 @@ IF(WIN32)
     ${LIBMARIADB_SOURCES}
     ${CC_SOURCE_DIR}/win-iconv/win_iconv.c
     win32_errmsg.c
-    win32_errmsg.h)
+    win32_errmsg.h
+    windows_utils.h)
 ELSE()
   IF(ICONV_INCLUDE_DIR)
      INCLUDE_DIRECTORIES(BEFORE ${ICONV_INCLUDE_DIR}) 
@@ -411,7 +412,7 @@ ELSE()
 ENDIF()
 
 
-IF(CMAKE_VERSION VERSION_GREATER 2.8.7)
+IF((NOT WIN32) AND CMAKE_VERSION VERSION_GREATER 2.8.7)
   # CREATE OBJECT LIBRARY 
   ADD_LIBRARY(mariadb_obj OBJECT ${LIBMARIADB_SOURCES})
   IF(UNIX)
@@ -497,13 +498,18 @@ IF(NOT WIN32)
   SET_TARGET_PROPERTIES(mariadbclient PROPERTIES OUTPUT_NAME "${LIBMARIADB_STATIC_NAME}")
 ENDIF()
 
-INSTALL(TARGETS mariadbclient
-          COMPONENT Development
-          DESTINATION ${INSTALL_LIBDIR})
 IF(WIN32)
+# INSTALL(TARGETS mariadbclient
+          # COMPONENT Development
+           # RUNTIME DESTINATION bin
+           # ARCHIVE DESTINATION lib
+           # LIBRARY DESTINATION lib)
+
 INSTALL(TARGETS libmariadb
         COMPONENT SharedLibraries
-        DESTINATION ${INSTALL_LIBDIR})
+           RUNTIME DESTINATION bin
+           ARCHIVE DESTINATION lib
+           LIBRARY DESTINATION lib)
 ELSE()
 # in cmake 3.12+ we can use
 #INSTALL(TARGETS libmariadb LIBRARY DESTINATION ${INSTALL_LIBDIR}
@@ -517,7 +523,9 @@ ENDIF()
 
 IF(MSVC)
    # On Windows, install PDB
-   INSTALL(FILES $<TARGET_PDB_FILE:libmariadb> DESTINATION "${INSTALL_LIBDIR}"
+   INSTALL(FILES $<TARGET_PDB_FILE:libmariadb> DESTINATION lib
            CONFIGURATIONS Debug RelWithDebInfo
            COMPONENT Development)
+   # INSTALL(FILES ${PROJECT_BINARY_DIR}/libmariadb/RelWithDebInfo/mariadbclient.pdb DESTINATION lib
+           # COMPONENT Development)
 ENDIF()

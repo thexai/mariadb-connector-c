@@ -380,27 +380,16 @@ static int ma_tls_set_certs(MYSQL *mysql, SSL_CTX *ctx)
 
   if (keyfile && keyfile[0])
   {
-    FILE *fp;
-    if ((fp= fopen(keyfile, "rb")))
+    if (SSL_CTX_use_PrivateKey_file(ctx, keyfile, SSL_FILETYPE_PEM) != 1)
     {
-      EVP_PKEY *key= EVP_PKEY_new();
-      PEM_read_PrivateKey(fp, &key, NULL, pw);
-      fclose(fp);
-      if (SSL_CTX_use_PrivateKey(ctx, key) != 1)
-      {
-        unsigned long err= ERR_peek_error();
-        EVP_PKEY_free(key);
-        if (!(ERR_GET_LIB(err) == ERR_LIB_X509 &&
-	            ERR_GET_REASON(err) == X509_R_CERT_ALREADY_IN_HASH_TABLE))
-          goto error;
-      }
-      EVP_PKEY_free(key);
-    } else {
-      my_set_error(mysql, CR_SSL_CONNECTION_ERROR, SQLSTATE_UNKNOWN, 
-                   CER(CR_FILE_NOT_FOUND), keyfile);
-      return 1;
+      unsigned long err = ERR_peek_error();
+
+      if (!(ERR_GET_LIB(err) == ERR_LIB_X509 &&
+            ERR_GET_REASON(err) == X509_R_CERT_ALREADY_IN_HASH_TABLE))
+        goto error;
     }
   }
+
   /* verify key */
   if (certfile && SSL_CTX_check_private_key(ctx) != 1)
     goto error;

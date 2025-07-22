@@ -30,6 +30,8 @@
 #include <string.h>
 #include <ma_string.h>
 
+#include "windows_utils.h"
+
 /* Function prototypes */
 my_bool pvio_npipe_set_timeout(MARIADB_PVIO *pvio, enum enum_pvio_timeout type, int timeout);
 int pvio_npipe_get_timeout(MARIADB_PVIO *pvio, enum enum_pvio_timeout type);
@@ -245,7 +247,6 @@ my_bool pvio_npipe_connect(MARIADB_PVIO *pvio, MA_PVIO_CINFO *cinfo)
 
   if (cinfo->type == PVIO_TYPE_NAMEDPIPE)
   {
-    char szPipeName[MAX_PATH];
     ULONGLONG deadline;
     LONGLONG wait_ms;
     DWORD backoff= 0; /* Avoid busy wait if ERROR_PIPE_BUSY.*/
@@ -254,8 +255,19 @@ my_bool pvio_npipe_connect(MARIADB_PVIO *pvio, MA_PVIO_CINFO *cinfo)
     if (!cinfo->host || !strcmp(cinfo->host,LOCAL_HOST))
       cinfo->host=LOCAL_HOST_NAMEDPIPE;
 
+#ifdef MS_APP
+    wchar_t szPipeNameW[MAX_PATH];
+    wchar_t* host = to_utf16(cinfo->host);
+    wchar_t* unix_socket = to_utf16(cinfo->unix_socket);
+    _snwprintf(szPipeNameW, MAX_PATH - 1, L"\\\\%s\\pipe\\%s", host, unix_socket);
+    szPipeNameW[MAX_PATH - 1] = L'\0';
+    free(host);
+    free(unix_socket);
+#else
+    char szPipeName[MAX_PATH];
     szPipeName[MAX_PATH - 1]= 0;
     snprintf(szPipeName, MAX_PATH - 1, "\\\\%s\\pipe\\%s", cinfo->host, cinfo->unix_socket);
+#endif
 
     if (pvio->timeout[PVIO_CONNECT_TIMEOUT] > 0)
       deadline = GetTickCount64() + pvio->timeout[PVIO_CONNECT_TIMEOUT];
@@ -264,7 +276,11 @@ my_bool pvio_npipe_connect(MARIADB_PVIO *pvio, MA_PVIO_CINFO *cinfo)
 
     while (1)
     {
+#ifdef MS_APP
+      if ((cpipe->pipe = uwp_create_file(szPipeNameW,
+#else
       if ((cpipe->pipe = CreateFile(szPipeName,
+#endif
                                     GENERIC_READ |
                                     GENERIC_WRITE,
                                     0,               /* no sharing */
@@ -289,7 +305,11 @@ my_bool pvio_npipe_connect(MARIADB_PVIO *pvio, MA_PVIO_CINFO *cinfo)
       if (wait_ms > INFINITE)
         wait_ms = INFINITE;
 
+#ifdef MS_APP
+      if ((wait_ms <= 0) || !WaitNamedPipeW(szPipeNameW, (DWORD)wait_ms))
+#else
       if ((wait_ms <= 0) || !WaitNamedPipe(szPipeName, (DWORD)wait_ms))
+#endif
       {
         pvio->set_error(pvio->mysql, CR_NAMEDPIPEWAIT_ERROR, "HY000", 0,
                        cinfo->host, cinfo->unix_socket, ERROR_TIMEOUT);

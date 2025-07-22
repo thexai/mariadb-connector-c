@@ -5,27 +5,34 @@
 #  BSD license.
 #  For details see the COPYING-CMAKE-SCRIPTS file.
 #
-MACRO(GET_CONNECTOR_PACKAGE_NAME name)
-# check if we have 64bit
-IF(SIZEOF_VOIDP EQUAL 8)
-  SET(IS64 1)
-ENDIF()
 
+include(CheckSymbolExists)
+
+check_symbol_exists(_X86_ "Windows.h" _X86_)
+check_symbol_exists(_AMD64_ "Windows.h" _AMD64_)
+check_symbol_exists(_ARM_ "Windows.h" _ARM_)
+check_symbol_exists(_ARM64_ "Windows.h" _ARM64_)
+
+MACRO(GET_CONNECTOR_PACKAGE_NAME name)
 SET (PLATFORM_NAME ${CMAKE_SYSTEM_NAME})
 SET (MACHINE_NAME ${CMAKE_SYSTEM_PROCESSOR})
 SET (CONCAT_SIGN "-")
 
 IF(CMAKE_SYSTEM_NAME MATCHES "Windows")
-  SET(PLATFORM_NAME "win")
+  IF(CMAKE_SYSTEM_NAME MATCHES "WindowsStore")
+    SET(PLATFORM_NAME "winstore")
+   ELSE()
+    SET(PLATFORM_NAME "win")
+  ENDIF()
   SET(CONCAT_SIGN "")
-  IF(IS64)
-    IF(CMAKE_C_COMPILER_ARCHITECTURE_ID)
-      STRING(TOLOWER "${CMAKE_C_COMPILER_ARCHITECTURE_ID}" MACHINE_NAME)
-    ELSE()
-      SET(MACHINE_NAME x64)
-    ENDIF()
-  ELSE()
+  IF(_x86_)
     SET(MACHINE_NAME "32")
+  ELSEIF(_AMD64_)
+    SET(MACHINE_NAME "x64")
+  ELSEIF(_ARM_)
+    SET(MACHINE_NAME "arm")
+  ELSEIF(_ARM64_)
+    SET(MACHINE_NAME "arm64")
   ENDIF()
 ENDIF()
 

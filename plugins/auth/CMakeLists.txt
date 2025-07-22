@@ -4,7 +4,7 @@ INCLUDE_DIRECTORIES(${AUTH_DIR})
 INCLUDE_DIRECTORIES(${CC_SOURCE_DIR}/include)
 
 SET(CRYPTO_PLUGIN 1)
-IF(WIN32)
+IF(WIN32 AND NOT WINDOWS_STORE)
   ADD_DEFINITIONS(-DHAVE_WINCRYPT)
   SET(CRYPT_SOURCE ${CC_SOURCE_DIR}/libmariadb/secure/win_crypt.c)
   SET(CRYPT_LIBS crypt32 bcrypt)
@@ -27,6 +27,7 @@ REGISTER_PLUGIN(TARGET mysql_native_password
                 DEFAULT STATIC
                 SOURCES ${CC_SOURCE_DIR}/plugins/auth/my_auth.c)
 
+if(NOT WINDOWS_STORE)
 #Dialog client authentication plugin
 REGISTER_PLUGIN(TARGET dialog
                 TYPE AUTH
@@ -34,6 +35,7 @@ REGISTER_PLUGIN(TARGET dialog
                 DEFAULT DYNAMIC
                 SOURCES ${CC_SOURCE_DIR}/plugins/auth/dialog.c
                         ${CC_SOURCE_DIR}/libmariadb/get_password.c)
+endif()
 
 
 # Crypto plugins
