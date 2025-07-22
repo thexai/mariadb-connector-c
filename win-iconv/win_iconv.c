@@ -687,6 +687,9 @@ static RFC1766TOLCIDA Rfc1766ToLcidA;
 static int
 load_mlang(void)
 {
+#ifdef MS_APP
+    return FALSE;
+#else
     HMODULE h;
     if (ConvertINetString != NULL)
         return TRUE;
@@ -700,6 +703,7 @@ load_mlang(void)
     LcidToRfc1766A = (LCIDTORFC1766A)GetProcAddressA(h, "LcidToRfc1766A");
     Rfc1766ToLcidA = (RFC1766TOLCIDA)GetProcAddressA(h, "Rfc1766ToLcidA");
     return TRUE;
+#endif
 }
 
 iconv_t

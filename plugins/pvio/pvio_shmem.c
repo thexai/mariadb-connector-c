@@ -29,6 +29,8 @@
 #include <string.h>
 #include <ma_string.h>
 
+#include "../../libmariadb/windows_utils.h"
+
 #define PVIO_SHM_BUFFER_SIZE (16000 + 4)
 
 my_bool pvio_shm_set_timeout(MARIADB_PVIO *pvio, enum enum_pvio_timeout type, int timeout);
@@ -277,7 +279,7 @@ my_bool pvio_shm_connect(MARIADB_PVIO *pvio, MA_PVIO_CINFO *cinfo)
     len= sprintf(shm_name, "%s%s_", prefixes[i], base_memory_name);
     shm_suffix= shm_name + len;
     strcpy(shm_suffix, "CONNECT_REQUEST");
-    if ((hdlConnectRequest= OpenEvent(dwDesiredAccess, 0, shm_name)))
+    if ((hdlConnectRequest= OpenEventA(dwDesiredAccess, 0, shm_name)))
     {
       /* save prefix to prevent further loop */
       shm_prefix= prefixes[i];
@@ -292,7 +294,7 @@ my_bool pvio_shm_connect(MARIADB_PVIO *pvio, MA_PVIO_CINFO *cinfo)
   }
 
   strcpy(shm_suffix, "CONNECT_ANSWER");
-  if (!(hdlConnectRequestAnswer= OpenEvent(dwDesiredAccess, 0, shm_name)))
+  if (!(hdlConnectRequestAnswer= OpenEventA(dwDesiredAccess, 0, shm_name)))
   {
     PVIO_SET_ERROR(cinfo->mysql, CR_SHARED_MEMORY_CONNECT_ERROR, "HY000", 0, "Opening CONNECT_ANSWER event failed", GetLastError());
     goto error;
@@ -300,7 +302,13 @@ my_bool pvio_shm_connect(MARIADB_PVIO *pvio, MA_PVIO_CINFO *cinfo)
   
   /* get connection id, so we can build the filename used for connection */
   strcpy(shm_suffix, "CONNECT_DATA");
+
+#ifdef MS_APP
+  wchar_t* shm_nameW = to_utf16(shm_name);
+  if (!(file_map = OpenFileMappingW(FILE_MAP_WRITE, 0, shm_nameW)))
+#else
   if (!(file_map= OpenFileMapping(FILE_MAP_WRITE, 0, shm_name)))
+#endif
   {
     PVIO_SET_ERROR(cinfo->mysql, CR_SHARED_MEMORY_CONNECT_ERROR, "HY000", 0, "OpenFileMapping failed", GetLastError());
     goto error;
@@ -347,7 +355,14 @@ my_bool pvio_shm_connect(MARIADB_PVIO *pvio, MA_PVIO_CINFO *cinfo)
   shm_suffix= shm_name + len;
   
   strcpy(shm_suffix, "DATA");
+
+#ifdef MS_APP
+  free(shm_nameW);
+  shm_nameW = to_utf16(shm_name);
+  pvio_shm->file_map = OpenFileMappingW(FILE_MAP_WRITE, 0, shm_nameW);
+#else
   pvio_shm->file_map= OpenFileMapping(FILE_MAP_WRITE, 0, shm_name);
+#endif
   if (pvio_shm->file_map == NULL)
   {
     PVIO_SET_ERROR(cinfo->mysql, CR_SHARED_MEMORY_CONNECT_ERROR, "HY000", 0, "OpenFileMapping failed", GetLastError());
@@ -362,7 +377,7 @@ my_bool pvio_shm_connect(MARIADB_PVIO *pvio, MA_PVIO_CINFO *cinfo)
   for (i=0; i < 5; i++)
   {
     strcpy(shm_suffix, StrEvent[i]);
-    if (!(pvio_shm->event[i]= OpenEvent(dwDesiredAccess, 0, shm_name)))
+    if (!(pvio_shm->event[i]= OpenEventA(dwDesiredAccess, 0, shm_name)))
     {
       PVIO_SET_ERROR(cinfo->mysql, CR_SHARED_MEMORY_CONNECT_ERROR, "HY000", 0, "Couldn't create event", GetLastError());
       goto error;
@@ -378,6 +393,10 @@ error:
     CloseHandle(hdlConnectRequestAnswer);
   if (shm_name)
     LocalFree(shm_name);
+#ifdef MS_APP
+  if (shm_nameW)
+      free(shm_nameW);
+#endif
   if (map)
     UnmapViewOfFile(map);
   if (file_map)

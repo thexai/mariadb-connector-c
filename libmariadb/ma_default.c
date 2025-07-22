@@ -29,6 +29,8 @@
 #include <io.h>
 #include "shlwapi.h"
 
+#include "windows_utils.h"
+
 #define access _access
 
 static const char *ini_exts[]= {"ini", "cnf", 0};
@@ -75,9 +77,6 @@ void release_configuration_dirs()
 
 char **get_default_configuration_dirs()
 {
-#ifdef _WIN32
-  char dirname[FN_REFLEN];
-#endif
   char *env;
 
   configuration_dirs= (char **)calloc(1, (MAX_CONFIG_DIRS + 1) * sizeof(char *));
@@ -92,6 +91,8 @@ char **get_default_configuration_dirs()
      4. C:\
   */
 
+#ifndef MS_APP
+  char dirname[FN_REFLEN];
   if (!GetSystemWindowsDirectory(dirname, FN_REFLEN) ||
       add_cfg_dir(configuration_dirs, dirname))
     goto error;
@@ -102,13 +103,30 @@ char **get_default_configuration_dirs()
 
   if (add_cfg_dir(configuration_dirs, "C:"))
     goto error;
+#endif
 
+#ifdef MS_APP
+  wchar_t dirnameW[FN_REFLEN];
+  if (GetModuleFileNameW(NULL, dirnameW, FN_REFLEN))
+  {
+    dirnameW[wcslen(dirnameW) - wcslen(wcsrchr(dirnameW, L'\\'))] = L'\0';
+    char* dir = to_utf8(dirnameW);
+    if (dir) {
+      if (add_cfg_dir(configuration_dirs, dir)) {
+        free(dir);
+        goto error;
+      }
+      free(dir);
+    }
+  }
+#else
   if (GetModuleFileName(NULL, dirname, FN_REFLEN))
   {
     PathRemoveFileSpec(dirname);
     if (add_cfg_dir(configuration_dirs, dirname))
       goto error;
   }
+#endif
 #else
   /* on *nix platforms configuration files are stored in
      1. SYSCONFDIR (if build happens inside server package, or
